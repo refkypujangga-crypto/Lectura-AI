@@ -123,25 +123,6 @@
                     <i class="fa-solid fa-sliders text-blue-400"></i> Pengaturan Dosen AI
                 </h3>
 
-                <!-- API Key Input for Public Deployment -->
-                <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3">
-                    <div class="flex items-center justify-between mb-1.5">
-                        <label class="text-xs font-semibold text-blue-400 flex items-center gap-1.5">
-                            <i class="fa-solid fa-key"></i> Gemini API Key
-                        </label>
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="text-[10px] text-slate-400 hover:text-blue-400 underline flex items-center gap-1">
-                            Dapatkan Key <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
-                        </a>
-                    </div>
-                    <div class="relative">
-                        <input type="password" id="userApiKeyInput" placeholder="Masukkan Google Gemini API Key..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 pr-8">
-                        <button type="button" id="toggleApiKeyVisibility" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs p-1">
-                            <i class="fa-regular fa-eye"></i>
-                        </button>
-                    </div>
-                    <p class="text-[10px] text-slate-500 mt-1">Dibutuhkan agar AI berjalan saat dipublikasikan ke publik.</p>
-                </div>
-
                 <!-- Gaya Penjelasan -->
                 <div>
                     <label class="block text-xs text-slate-400 mb-1.5">Gaya Penjelasan</label>
@@ -272,6 +253,13 @@
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
 
+        // =========================================================================
+        // TEMPELKAN GEMINI API KEY PERMANEN ANDA DI SINI
+        // Contoh: const PERMANENT_API_KEY = "AIzaSyD1234567890abcdef...";
+        // =========================================================================
+        const PERMANENT_API_KEY = "AQ.Ab8RN6KP9i6iEuWTCRHGgwCFSmlOneNB7_6JFZ6F4IKvZZzb1A";
+        // =========================================================================
+
         // State Variables
         let extractedText = "";
         let generatedScript = "";
@@ -280,15 +268,10 @@
         let isPlaying = false;
         let visualizerInterval = null;
 
-        // Default empty for canvas environment resolution or user custom key
-        let apiKey = "";
-
         // DOM Elements
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const rawTextInput = document.getElementById('rawTextInput');
-        const userApiKeyInput = document.getElementById('userApiKeyInput');
-        const toggleApiKeyVisibility = document.getElementById('toggleApiKeyVisibility');
         const generateBtn = document.getElementById('generateBtn');
         const playAudioBtn = document.getElementById('playAudioBtn');
         const downloadAudioBtn = document.getElementById('downloadAudioBtn');
@@ -303,27 +286,6 @@
         const clearBtn = document.getElementById('clearBtn');
         const fileStatusTitle = document.getElementById('fileStatusTitle');
         const fileStatusSub = document.getElementById('fileStatusSub');
-
-        // Load saved API Key from localStorage if available
-        const savedApiKey = localStorage.getItem('lectura_gemini_api_key');
-        if (savedApiKey) {
-            userApiKeyInput.value = savedApiKey;
-        }
-
-        userApiKeyInput.addEventListener('input', (e) => {
-            const keyVal = e.target.value.trim();
-            if (keyVal) {
-                localStorage.setItem('lectura_gemini_api_key', keyVal);
-            } else {
-                localStorage.removeItem('lectura_gemini_api_key');
-            }
-        });
-
-        toggleApiKeyVisibility.addEventListener('click', () => {
-            const isPassword = userApiKeyInput.type === 'password';
-            userApiKeyInput.type = isPassword ? 'text' : 'password';
-            toggleApiKeyVisibility.innerHTML = isPassword ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
-        });
 
         // Custom Modal Alert Helper
         function showAlert(title, message) {
@@ -510,9 +472,12 @@
                 return;
             }
 
-            // Determine API Key to use (Input box > Canvas environment injection)
-            const inputApiKey = userApiKeyInput.value.trim();
-            apiKey = inputApiKey || "";
+            const apiKey = PERMANENT_API_KEY.trim();
+
+            if (!apiKey || apiKey === "GANTI_DENGAN_GEMINI_API_KEY_ANDA") {
+                showAlert("API Key Belum Diisi", "Harap masukkan Gemini API Key Anda pada variabel PERMANENT_API_KEY di dalam kode HTML.");
+                return;
+            }
 
             const selectedStyle = lectureStyle.value;
             const selectedVoice = voiceSelect.value;
@@ -561,7 +526,7 @@ Petunjuk Penting:
                 if (!llmResponse.ok) {
                     const errJson = await llmResponse.json().catch(() => ({}));
                     if (llmResponse.status === 400 || llmResponse.status === 401 || llmResponse.status === 403) {
-                        throw new Error("API Key Gemini tidak valid atau belum diisi. Silakan masukkan Gemini API Key Anda di kolom yang telah disediakan.");
+                        throw new Error("API Key Gemini tidak valid. Silakan periksa kembali nilai PERMANENT_API_KEY di dalam kode HTML Anda.");
                     }
                     throw new Error(errJson?.error?.message || `Gagal menghubungi API Gemini (HTTP ${llmResponse.status}).`);
                 }
