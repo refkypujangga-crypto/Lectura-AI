@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lectura AI - Asisten Dosen Suara</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Plus Jakarta Sans) -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- PDF.js for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Mammoth.js for DOCX files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f6ff',
+                            100: '#e0edff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .pulse-ring {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5);
+            animation: pulse-wave 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-wave {
+            to {
+                box-shadow: 0 0 0 20px rgba(37, 99, 235, 0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight flex items-center gap-2">
+                        Lectura <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">AI Voice</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Jelaskan Materi Kuliah dengan Suara AI</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-slate-400 hidden sm:inline-block">Ditenagai oleh Gemini API</span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Panel: Document Upload & Controls -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- File Drop Area -->
+            <div class="bg-slate-800/60 border-2 border-dashed border-slate-700 hover:border-blue-500 transition-colors rounded-2xl p-6 text-center relative group cursor-pointer" id="dropZone">
+                <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt,.ppt,.pptx">
+                <div class="w-14 h-14 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                </div>
+                <h3 class="font-semibold text-slate-200 mb-1" id="fileStatusTitle">Unggah Materi Kuliah</h3>
+                <p class="text-xs text-slate-400 mb-3" id="fileStatusSub">Dukungan format PDF, DOCX, PPT, atau TXT</p>
+                <button type="button" onclick="document.getElementById('fileInput').click()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition-all">
+                    Pilih File Materi
+                </button>
+            </div>
+
+            <!-- Manual Text Input Option -->
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-align-left text-blue-400"></i> Atau Tempel Teks Materi
+                    </label>
+                    <button id="clearBtn" class="text-xs text-slate-500 hover:text-red-400 transition-colors">Hapus</button>
+                </div>
+                <textarea id="rawTextInput" placeholder="Tempel materi perkuliahan, slide presentasi, atau ringkasan modul di sini..." class="w-full h-32 bg-slate-900/80 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 custom-scrollbar resize-none"></textarea>
+            </div>
+
+            <!-- AI Lecture Settings -->
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
+                <h3 class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-blue-400"></i> Pengaturan Dosen AI
+                </h3>
+
+                <!-- Gaya Penjelasan -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5">Gaya Penjelasan</label>
+                    <select id="lectureStyle" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="santai">Santai & Ringkas (Mudah Dipahami)</option>
+                        <option value="akademis" selected>Akademis & Terstruktur (Seperti Dosen Asli)</option>
+                        <option value="analog">Banyak Analogi & Contoh Studi Kasus</option>
+                        <option value="poin">Poin-Poin Penting Ujian (Fast Review)</option>
+                    </select>
+                </div>
+
+                <!-- Pilihan Suara AI -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5">Karakter Suara AI</label>
+                    <select id="voiceSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="Kore">Kore (Suara Pria Tegas & Jelas)</option>
+                        <option value="Zephyr" selected>Zephyr (Suara Pria Enerjik & Ramah)</option>
+                        <option value="Puck">Puck (Suara Pria Santai)</option>
+                        <option value="Aoede">Aoede (Suara Wanita Ramah & Jelas)</option>
+                        <option value="Callirrhoe">Callirrhoe (Suara Wanita Tenang)</option>
+                    </select>
+                </div>
+
+                <!-- Generate Button -->
+                <button id="generateBtn" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Buat Penjelasan Dosen AI
+                </button>
+            </div>
+
+        </section>
+
+        <!-- Right Panel: Output & Voice Player -->
+        <section class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- Voice Player Box -->
+            <div id="playerCard" class="bg-gradient-to-br from-slate-800 to-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div id="avatarBox" class="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30 text-xl">
+                            <i class="fa-solid fa-microphone-lines"></i>
+                        </div>
+                        <div>
+                            <h2 id="speakerName" class="font-bold text-slate-100 text-base">Asisten Kuliah AI</h2>
+                            <p id="playerStatus" class="text-xs text-slate-400">Siap menjelaskan materi Anda</p>
+                        </div>
+                    </div>
+                    <span id="audioBadge" class="text-xs px-2.5 py-1 bg-slate-700/50 rounded-full text-slate-400 font-mono">00:00</span>
+                </div>
+
+                <!-- Audio Visualizer Waves -->
+                <div id="visualizer" class="h-16 bg-slate-900/60 rounded-xl mb-4 flex items-center justify-center gap-1.5 px-4 overflow-hidden border border-slate-800">
+                    <div class="w-1 bg-blue-500/30 h-3 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-6 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-10 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-4 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-8 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-12 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-5 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-9 rounded-full transition-all duration-150 visual-bar"></div>
+                    <div class="w-1 bg-blue-500/30 h-3 rounded-full transition-all duration-150 visual-bar"></div>
+                </div>
+
+                <!-- Playback Controls -->
+                <div class="flex items-center justify-between">
+                    <button id="playAudioBtn" disabled class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-md transition-all">
+                        <i class="fa-solid fa-play"></i> Putar Suara
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="downloadAudioBtn" disabled class="p-2.5 bg-slate-700/50 hover:bg-slate-700 text-slate-300 disabled:opacity-40 rounded-xl text-xs border border-slate-600 transition-colors" title="Unduh Suara">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Script Output Box -->
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col min-h-[300px]">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-3">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-file-lines text-blue-400"></i> Naskah Penjelasan Kuliah
+                    </h3>
+                    <button id="copyScriptBtn" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors">
+                        <i class="fa-regular fa-copy"></i> Salin
+                    </button>
+                </div>
+                
+                <!-- Summary / Explanation Content -->
+                <div id="explanationContent" class="text-xs sm:text-sm text-slate-300 leading-relaxed space-y-3 custom-scrollbar overflow-y-auto max-h-[400px] pr-2">
+                    <p class="text-slate-500 italic">Belum ada penjelasan yang dibuat. Unggah materi perkuliahan Anda lalu klik tombol "Buat Penjelasan Dosen AI".</p>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Custom Alert Modal (No browser alert) -->
+    <div id="alertModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-circle-info"></i>
+            </div>
+            <h3 class="font-semibold text-slate-100 text-sm mb-2" id="alertTitle">Pemberitahuan</h3>
+            <p class="text-xs text-slate-400 mb-5" id="alertMessage">Pesan informasi</p>
+            <button id="alertCloseBtn" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-colors">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Status Loading -->
+    <div id="loadingModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-16 h-16 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center mx-auto mb-4 pulse-ring">
+                <i class="fa-solid fa-brain text-2xl animate-bounce"></i>
+            </div>
+            <h3 class="font-bold text-slate-100 text-base mb-1" id="loadingTitle">Menganalisis Materi...</h3>
+            <p class="text-xs text-slate-400 mb-4" id="loadingSubtitle">Menyusun materi menjadi naskah kuliah yang mudah dipahami...</p>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-blue-500 h-full w-1/2 animate-pulse rounded-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // Setup PDF.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        // State Variables
+        let extractedText = "";
+        let generatedScript = "";
+        let audioUrl = null;
+        let currentAudio = null;
+        let isPlaying = false;
+        let visualizerInterval = null;
+
+        // API Key (handled automatically by environment if empty string)
+        const apiKey = "";
+
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const rawTextInput = document.getElementById('rawTextInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const playAudioBtn = document.getElementById('playAudioBtn');
+        const downloadAudioBtn = document.getElementById('downloadAudioBtn');
+        const explanationContent = document.getElementById('explanationContent');
+        const loadingModal = document.getElementById('loadingModal');
+        const loadingTitle = document.getElementById('loadingTitle');
+        const loadingSubtitle = document.getElementById('loadingSubtitle');
+        const playerStatus = document.getElementById('playerStatus');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const lectureStyle = document.getElementById('lectureStyle');
+        const copyScriptBtn = document.getElementById('copyScriptBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const fileStatusTitle = document.getElementById('fileStatusTitle');
+        const fileStatusSub = document.getElementById('fileStatusSub');
+
+        // Custom Modal Alert Helper
+        function showAlert(title, message) {
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('alertModal').classList.remove('hidden');
+        }
+        document.getElementById('alertCloseBtn').addEventListener('click', () => {
+            document.getElementById('alertModal').classList.add('hidden');
+        });
+
+        // File Drag & Drop Events
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-500/10');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-500', 'bg-blue-500/10');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-500/10');
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            rawTextInput.value = "";
+            extractedText = "";
+            fileStatusTitle.textContent = "Unggah Materi Kuliah";
+            fileStatusSub.textContent = "Dukungan format PDF, DOCX, PPT, atau TXT";
+        });
+
+        // Parse File Content
+        async function handleFileSelect(file) {
+            const fileName = file.name;
+            const ext = fileName.split('.').pop().toLowerCase();
+            
+            showLoading("Membaca File...", `Mengekstrak teks dari ${fileName}`);
+
+            try {
+                if (ext === 'pdf') {
+                    extractedText = await readPDF(file);
+                } else if (ext === 'docx') {
+                    extractedText = await readDocx(file);
+                } else if (ext === 'txt') {
+                    extractedText = await readTxt(file);
+                } else if (ext === 'ppt' || ext === 'pptx') {
+                    extractedText = await readTxt(file); 
+                } else {
+                    hideLoading();
+                    showAlert("Format Tidak Didukung", "Harap unggah file dengan format PDF, DOCX, PPT, atau TXT.");
+                    return;
+                }
+
+                if (!extractedText.trim()) {
+                    hideLoading();
+                    showAlert("Teks Kosong", "File tidak memuat teks yang dapat dibaca atau berbentuk gambar murni.");
+                    return;
+                }
+
+                rawTextInput.value = extractedText;
+                fileStatusTitle.textContent = fileName;
+                fileStatusSub.textContent = `File berhasil dibaca (${Math.round(file.size / 1024)} KB)`;
+                hideLoading();
+                showAlert("Berhasil Diproses", `File ${fileName} berhasil dibaca dan dimasukkan ke dalam input.`);
+            } catch (err) {
+                console.error("Error reading file:", err);
+                hideLoading();
+                showAlert("Gagal Membaca File", "Terjadi kesalahan saat membaca file. Anda dapat memilih untuk menyalin teks secara manual ke kotak teks.");
+            }
+        }
+
+        // Helper File Readers
+        function readTxt(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result || "");
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        async function readDocx(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            return result.value || "";
+        }
+
+        async function readPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let text = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const strings = content.items.map(item => item.str);
+                text += strings.join(" ") + "\n";
+            }
+            return text;
+        }
+
+        // Helper PCM to WAV Audio Converter
+        function pcmToWav(pcm16, sampleRate) {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // raw PCM
+            view.setUint16(22, 1, true); // Mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Chunk text safely at sentence boundaries
+        function chunkText(text, maxChars) {
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+            const chunks = [];
+            let currentChunk = "";
+
+            for (const sentence of sentences) {
+                if ((currentChunk + sentence).length > maxChars) {
+                    if (currentChunk.trim().length > 0) {
+                        chunks.push(currentChunk.trim());
+                    }
+                    currentChunk = sentence;
+                } else {
+                    currentChunk += " " + sentence;
+                }
+            }
+
+            if (currentChunk.trim().length > 0) {
+                chunks.push(currentChunk.trim());
+            }
+
+            return chunks.length > 0 ? chunks : [text];
+        }
+
+        // Generate Explanation Script using Gemini LLM
+        generateBtn.addEventListener('click', async () => {
+            const contentToProcess = rawTextInput.value.trim();
+            if (!contentToProcess) {
+                showAlert("Materi Kosong", "Harap unggah file materi kuliah atau masukkan teks materi pada kotak input.");
+                return;
+            }
+
+            const selectedStyle = lectureStyle.value;
+            const selectedVoice = voiceSelect.value;
+
+            showLoading("Menganalisis Materi...", "Mengolah materi menjadi naskah perkuliahan yang interaktif...");
+
+            try {
+                // Step 1: Generate Script Text via Gemini API
+                const styleInstruction = {
+                    santai: "Gunakan bahasa yang santai, akrab, mudah dipahami mahasiswa, dan ringkas.",
+                    akademis: "Gunakan bahasa akademis yang baku, terstruktur, profesional layaknya dosen di ruang kuliah.",
+                    analog: "Gunakan banyak ilustrasi analogi sehari-hari dan contoh studi kasus agar materi yang rumit mudah dipahami.",
+                    poin: "Fokus pada poin-poin utama, konsep penting yang sering keluar saat ujian (fast review)."
+                }[selectedStyle];
+
+                const prompt = `Anda adalah seorang Dosen Asisten Perkuliahan AI yang cerdas dan komunikatif.
+Tugas Anda adalah membaca materi perkuliahan berikut dan menyusun penjelasan lisan (seperti narasi dosen saat mengajar di kelas).
+
+Gaya Penjelasan: ${styleInstruction}
+
+Materi Kuliah:
+"""
+${contentToProcess.substring(0, 15000)}
+"""
+
+Petunjuk Penting:
+1. Sampaikan penjelasan secara langsung, alami, dan komunikatif dalam Bahasa Indonesia.
+2. Hindari format markdown yang rumit seperti simbol bintang berlebihan atau judul bab formal, fokus pada susunan narasi lisan yang enak didengar.
+3. Buat narasi penjelasan sepanjang kira-kira 3-5 paragraf yang mencakup inti materi.`;
+
+                const llmPayload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: {
+                        parts: [{ text: "Anda adalah Dosen AI penyampai materi kuliah yang ramah dan komunikatif." }]
+                    }
+                };
+
+                const llmApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const llmResponse = await fetch(llmApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(llmPayload)
+                });
+
+                const llmData = await llmResponse.json();
+                generatedScript = llmData?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!generatedScript) {
+                    throw new Error("Gagal mendapatkan naskah penjelasan dari Gemini API.");
+                }
+
+                // Format Script for UI
+                explanationContent.innerHTML = generatedScript
+                    .split('\n\n')
+                    .map(paragraph => `<p class="mb-3">${paragraph.replace(/\n/g, '<br>')}</p>`)
+                    .join('');
+
+                // Step 2: Generate Audio Speech using Gemini TTS API (with Chunking support)
+                updateLoading("Sintesis Suara AI...", "Mengubah seluruh naskah kuliah menjadi suara manusia alami...");
+
+                const textChunks = chunkText(generatedScript, 750);
+                const pcmChunks = [];
+
+                for (let i = 0; i < textChunks.length; i++) {
+                    updateLoading("Sintesis Suara AI...", `Memproses bagian audio ${i + 1} dari ${textChunks.length}...`);
+                    
+                    const ttsPayload = {
+                        contents: [{
+                            parts: [{ text: textChunks[i] }]
+                        }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: selectedVoice }
+                                }
+                            }
+                        }
+                    };
+
+                    const ttsApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+                    const ttsResponse = await fetch(ttsApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ttsPayload)
+                    });
+
+                    const ttsData = await ttsResponse.json();
+                    const audioPart = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+                    if (audioPart && audioPart.data) {
+                        const pcmBuffer = base64ToArrayBuffer(audioPart.data);
+                        pcmChunks.push(new Int16Array(pcmBuffer));
+                    }
+                }
+
+                if (pcmChunks.length > 0) {
+                    const totalLength = pcmChunks.reduce((acc, curr) => acc + curr.length, 0);
+                    const combinedPcm = new Int16Array(totalLength);
+                    let offset = 0;
+                    for (const chunk of pcmChunks) {
+                        combinedPcm.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+
+                    const wavBlob = pcmToWav(combinedPcm, 24000);
+                    
+                    if (audioUrl) URL.revokeObjectURL(audioUrl);
+                    audioUrl = URL.createObjectURL(wavBlob);
+
+                    if (currentAudio) currentAudio.pause();
+                    currentAudio = new Audio(audioUrl);
+                    
+                    playAudioBtn.disabled = false;
+                    downloadAudioBtn.disabled = false;
+                    playerStatus.textContent = `Penjelasan Lengkap Siap (${selectedVoice})`;
+
+                    // Play audio
+                    toggleAudio();
+                } else {
+                    playerStatus.textContent = "Audio tidak dapat diproses.";
+                }
+
+                hideLoading();
+
+            } catch (error) {
+                console.error("Error generating lecture:", error);
+                hideLoading();
+                showAlert("Terjadi Kesalahan", "Gagal membuat penjelasan suara: " + error.message);
+            }
+        });
+
+        // Audio Player Controls & Visualizer
+        playAudioBtn.addEventListener('click', toggleAudio);
+
+        function toggleAudio() {
+            if (!currentAudio) return;
+
+            if (isPlaying) {
+                currentAudio.pause();
+                isPlaying = false;
+                playAudioBtn.innerHTML = '<i class="fa-solid fa-play"></i> Putar Suara';
+                stopVisualizer();
+            } else {
+                currentAudio.play();
+                isPlaying = true;
+                playAudioBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Hentikan';
+                startVisualizer();
+
+                currentAudio.onended = () => {
+                    isPlaying = false;
+                    playAudioBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Putar Ulang';
+                    stopVisualizer();
+                };
+            }
+        }
+
+        // Download Audio File
+        downloadAudioBtn.addEventListener('click', () => {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `Lectura_Penjelasan_Materi.wav`;
+            a.click();
+        });
+
+        // Copy Script
+        copyScriptBtn.addEventListener('click', () => {
+            if (!generatedScript) return;
+            navigator.clipboard.writeText(generatedScript);
+            showAlert("Berhasil Disalin", "Naskah penjelasan materi kuliah telah disalin ke clipboard!");
+        });
+
+        // Visualizer Effect Animation
+        function startVisualizer() {
+            const bars = document.querySelectorAll('.visual-bar');
+            visualizerInterval = setInterval(() => {
+                bars.forEach(bar => {
+                    const h = Math.floor(Math.random() * 40) + 8;
+                    bar.style.height = `${h}px`;
+                    bar.style.backgroundColor = '#3b82f6';
+                });
+            }, 120);
+        }
+
+        function stopVisualizer() {
+            clearInterval(visualizerInterval);
+            const bars = document.querySelectorAll('.visual-bar');
+            bars.forEach(bar => {
+                bar.style.height = `12px`;
+                bar.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+            });
+        }
+
+        // Modal Controls
+        function showLoading(title, subtitle) {
+            loadingTitle.textContent = title;
+            loadingSubtitle.textContent = subtitle;
+            loadingModal.classList.remove('hidden');
+        }
+
+        function updateLoading(title, subtitle) {
+            loadingTitle.textContent = title;
+            loadingSubtitle.textContent = subtitle;
+        }
+
+        function hideLoading() {
+            loadingModal.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
